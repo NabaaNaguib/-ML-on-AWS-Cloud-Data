@@ -1,0 +1,1 @@
+in this folder is the data that I worked with in "5th session NTI.ipynb"
