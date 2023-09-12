@@ -1,0 +1,5 @@
+,num_legs,num_wings,num_specimen_seen
+falcon,2.0,2,10.0
+dog,4.0,0,
+spider,,0,1.0
+fish,0.0,0,8.0
