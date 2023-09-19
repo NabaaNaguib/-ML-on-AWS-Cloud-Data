@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Amazon Lex for JavaScript - Sample Application (NTBBot)</title>
+	<script src="https://sdk.amazonaws.com/js/aws-sdk-2.633.0.min.js"></script>
+	<style language="text/css">
+		body {
+			font-family:  "Helvetica Neue", "Arial";
+		}
+
+		input#wisdom {
+			padding: 4px;
+			font-size: 1em;
+			width: 380px
+		}
+
+		input::placeholder {
+			color: #ccc;
+			font-style: italic;
+		}
+
+		p.userRequest {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			min-width: 50%;
+			max-width: 85%;
+			float: left;
+			background-color: #7d7;
+		}
+
+		p.lexResponse {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			text-align: right;
+			min-width: 50%;
+			max-width: 85%;
+			float: right;
+			background-color: #bdf;
+			font-style: italic;
+		}
+
+		span.cardTitle {
+			display: block;
+			float: left;
+			width:  100%;
+			margin: 0px;
+			padding: 5px;
+			text-align: left;
+			font-style: normal;
+			font-weight: bolder;
+			color: #009
+		}
+
+		span.cardSubtitle {
+			display: block;
+			float: left;
+			width:  100%;
+			margin: 0px;
+			padding: 5px;
+			text-align: left;
+			font-style: normal;
+			font-weight: normal
+		}
+
+		span.cardOptions {
+			display: block;
+			float: left;
+			width:  90%;
+			margin: 0px;
+			padding: 12px;
+			text-align: center
+		}
+
+		a.cardOption {
+			display:  inline-block;
+			margin: 4px 8px 4px 8px;
+			padding: 6px;
+			border-radius: 6px;
+			background-color: #eef;
+			color: #009;
+			text-align: center;
+			font-style: normal;
+			font-weight: normal;
+			text-decoration: none
+		}
+
+		a.cardOption:hover {
+			background-color:  #ccf;
+		}
+
+		p.lexError {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			text-align: right;
+			min-width: 50%;
+			max-width: 85%;
+			float: right;
+			background-color: #f77;
+		}
+
+		a.appAction {
+			width:  80px;
+			display:  inline-block;
+			margin: 0px 8px 4px 8px;
+			padding: 12px;
+			border-radius: 6px;
+			background-color: #f67e00;
+			color: #fff;
+			text-align: center;
+			font-style: normal;
+			font-weight: normal;
+			text-decoration: none
+		}
+
+		a.appAction:hover {
+			background-color:  #e66e00;;
+		}
+	</style>
+	<meta name="viewport" content="width=420">
+</head>
+
+<body>
+	<h1 style="text-align:  left">Amazon Lex - Appointment BOT error</h1>
+	
+	<div id="searchResults" style="width: 380px; height: 450px; border: 1px solid #ccc; background-color: #eee; padding: 4px; overflow: scroll; margin-right: 10px; float: left; display: none"></div>
+	<div id="conversation" style="width: 380px; height: 450px; border: 1px solid #ccc; background-color: #eee; padding: 4px; overflow: scroll"></div>
+	<form id="chatform" style="margin-bottom: 10px" onsubmit="return pushChat();">
+		<p style="width: 380px; font-size: 0.8em; line-height: 1.2em">
+			<input type="text" id="wisdom" size="80" value="" placeholder="What do you want to do?">
+		</p>
+	</form>
+	
+	 <h2 style="text-align: left">There is an error</h2>
+</body>
+
+</html>

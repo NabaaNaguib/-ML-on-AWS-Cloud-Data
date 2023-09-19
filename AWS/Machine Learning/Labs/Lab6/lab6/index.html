@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Amazon Lex for JavaScript - Sample Application (NTBBot)</title>
+	<script src="https://sdk.amazonaws.com/js/aws-sdk-2.633.0.min.js"></script>
+	<style language="text/css">
+		body {
+			font-family:  "Helvetica Neue", "Arial";
+		}
+
+		input#wisdom {
+			padding: 4px;
+			font-size: 1em;
+			width: 380px
+		}
+
+		input::placeholder {
+			color: #ccc;
+			font-style: italic;
+		}
+
+		p.userRequest {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			min-width: 50%;
+			max-width: 85%;
+			float: left;
+			background-color: #7d7;
+		}
+
+		p.lexResponse {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			text-align: right;
+			min-width: 50%;
+			max-width: 85%;
+			float: right;
+			background-color: #bdf;
+			font-style: italic;
+		}
+
+		span.cardTitle {
+			display: block;
+			float: left;
+			width:  100%;
+			margin: 0px;
+			padding: 5px;
+			text-align: left;
+			font-style: normal;
+			font-weight: bolder;
+			color: #009
+		}
+
+		span.cardSubtitle {
+			display: block;
+			float: left;
+			width:  100%;
+			margin: 0px;
+			padding: 5px;
+			text-align: left;
+			font-style: normal;
+			font-weight: normal
+		}
+
+		span.cardOptions {
+			display: block;
+			float: left;
+			width:  90%;
+			margin: 0px;
+			padding: 12px;
+			text-align: center
+		}
+
+		a.cardOption {
+			display:  inline-block;
+			margin: 4px 8px 4px 8px;
+			padding: 6px;
+			border-radius: 6px;
+			background-color: #eef;
+			color: #009;
+			text-align: center;
+			font-style: normal;
+			font-weight: normal;
+			text-decoration: none
+		}
+
+		a.cardOption:hover {
+			background-color:  #ccf;
+		}
+
+		p.lexError {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			text-align: right;
+			min-width: 50%;
+			max-width: 85%;
+			float: right;
+			background-color: #f77;
+		}
+
+		a.appAction {
+			width:  80px;
+			display:  inline-block;
+			margin: 0px 8px 4px 8px;
+			padding: 12px;
+			border-radius: 6px;
+			background-color: #f67e00;
+			color: #fff;
+			text-align: center;
+			font-style: normal;
+			font-weight: normal;
+			text-decoration: none
+		}
+
+		a.appAction:hover {
+			background-color:  #e66e00;;
+		}
+	</style>
+	<meta name="viewport" content="width=420">
+</head>
+
+<body>
+	<h1 style="text-align:  left">Amazon Lex - Appointment BOT</h1>
+	
+	<div id="searchResults" style="width: 380px; height: 450px; border: 1px solid #ccc; background-color: #eee; padding: 4px; overflow: scroll; margin-right: 10px; float: left; display: none"></div>
+	<div id="conversation" style="width: 380px; height: 450px; border: 1px solid #ccc; background-color: #eee; padding: 4px; overflow: scroll"></div>
+	<form id="chatform" style="margin-bottom: 10px" onsubmit="return pushChat();">
+		<p style="width: 380px; font-size: 0.8em; line-height: 1.2em">
+			<input type="text" id="wisdom" size="80" value="" placeholder="What do you want to do?">
+		</p>
+	</form>
+	
+	<script type="text/javascript">
+		// set the focus to the input box
+		document.getElementById("wisdom").focus();
+
+		// Initialize the Amazon Cognito credentials provider
+		AWS.config.region = 'us-east-1'; // Region
+		AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+			IdentityPoolId: 'us-east-1:b1ec474e-4883-4f19-a247-78c1a6f821ee',
+		});
+
+		var lexruntime = new AWS.LexRuntime();
+		var lexUserId = 'chatbot-demo' + Date.now();
+		var sessionAttributes = {};
+		var responseCardOptions = null;
+
+		function pushChat(textToPush, labelToShow) {
+
+			// if there is text to be sent...
+			var wisdomText = document.getElementById('wisdom');
+			if (wisdomText && wisdomText.value && wisdomText.value.trim().length > 0) {
+
+				// disable input to show we're sending it
+				var wisdom = wisdomText.value.trim();
+				wisdomText.value = '...';
+				wisdomText.locked = true;
+
+				// if a response card was being used and the user typed in an option that is one
+				// of the responses, then send the value of the response, not the text that was typed in
+				if (responseCardOptions && (! labelToShow)) {
+
+					// this means a response card was shown to the user, but she chose to type in a response instead
+					// of clicking
+					// TODO:  hide the responseCardOptions
+					for (var i=0; (i < responseCardOptions.length); (i++)) {
+
+						var item = responseCardOptions[i];
+						if (wisdom.toUpperCase() === item.text.toUpperCase()) {
+
+							textToPush = item.value;
+							labelToShow = item.text;
+							// break out of the loop
+							i = responseCardOptions.length + 1;
+						}
+					}
+				}
+
+				// send it to the Lex runtime
+				var params = {
+					botAlias: 'freechabottest',
+					botName: 'ScheduleAppointment',
+					// if the caller has specifically provided text to be pushed, use it
+					inputText: (textToPush ? textToPush : wisdom),
+					userId: lexUserId,
+					sessionAttributes: sessionAttributes
+				};
+
+				// if the caller has specifically provided a label to be shown, show it
+				showRequest((labelToShow ? labelToShow : wisdom));
+
+				// do a KB search if requested (not used when the input is from a response card)
+				/*
+				if (params.inputText != textToPush) {
+					showKBResponse(params.inputText);
+				}
+				*/
+
+				lexruntime.postText(params, function(err, data) {
+
+					if (err) {
+						console.log(err, err.stack);
+						showError('Error:  ' + err.message + ' (see console for details)')
+					}
+					if (data) {
+
+						// check for missed utterances
+						checkForMissedUtterances(data);
+
+						// capture the sessionAttributes for the next cycle
+						sessionAttributes = data.sessionAttributes;
+						// reset the responseCardOptions
+						responseCardOptions = null;
+						// show response and/or error/dialog status
+						showResponse(data);
+					}
+					// re-enable input
+					wisdomText.value = '';
+					wisdomText.locked = false;
+				});
+			}
+			// we always cancel form submission
+			return false;
+		}
+
+		function checkForMissedUtterances(lexResponse) {
+
+			// clarificationPrompt entries for the bot so we know when we get these responses
+			var clarificationPrompts = [
+				'I hate to admit it, but I only know about Amazon Lex FAQs at this time. Sorry.',
+				'Sorry; I don\'t understand that. Can we try something easier like, "Tell me about Amazon Lex."'
+			];
+
+			if (! lexResponse.sessionAttributes) {
+
+				lexResponse.sessionAttributes = {};
+				lexResponse.sessionAttributes.missedUtterances = '0';
+			}
+
+			// missed utterances result in an ElicitIntent
+			if (lexResponse.dialogState && (lexResponse.dialogState === 'ElicitIntent')) {
+
+				// missed utterances result in clarificationPrompts
+				if (lexResponse.message && (clarificationPrompts.indexOf(lexResponse.message) != -1)) {
+
+					lexResponse.sessionAttributes.missedUtterances =
+						((parseInt(lexResponse.sessionAttributes.missedUtterances) || 0) + 1).toString();
+					return;
+				}
+			}
+
+			// if we got to this point, then we didn't have a missed utterance
+			lexResponse.sessionAttributes.missedUtterances = '0';
+		}
+
+		function showRequest(daText) {
+
+			var conversationDiv = document.getElementById('conversation');
+			var requestPara = document.createElement("P");
+			requestPara.className = 'userRequest';
+			requestPara.appendChild(document.createTextNode(daText));
+			conversationDiv.appendChild(requestPara);
+			conversationDiv.scrollTop = conversationDiv.scrollHeight;
+
+			// also add it to the kbDiv
+			var kbDiv = document.getElementById('searchResults');
+			requestPara = document.createElement("P");
+			requestPara.className = 'userRequest';
+			requestPara.appendChild(document.createTextNode(daText));
+			kbDiv.appendChild(requestPara);
+			kbDiv.scrollTop = kbDiv.scrollHeight;
+		}
+
+		function showError(daText) {
+
+			var conversationDiv = document.getElementById('conversation');
+			var errorPara = document.createElement("P");
+			errorPara.className = 'lexError';
+			errorPara.appendChild(document.createTextNode(daText));
+			conversationDiv.appendChild(errorPara);
+			conversationDiv.scrollTop = conversationDiv.scrollHeight;
+		}
+
+		function postCardOption(optionLabel, optionValue, optionsSpan) {
+
+			// hide the options, now that one has been chosen
+			// TODO:  also do this if the user has typed an answer
+			optionsSpan.style.display = 'none';
+
+			// post the optionLabel to the bot, but show the optonValue
+			var wisdomText = document.getElementById('wisdom');
+			if (wisdomText) {
+
+				wisdomText.value = optionLabel;
+				pushChat(optionValue, optionLabel);
+			}
+		}
+
+		function renderResponseCard(responseCard, responsePara) {
+
+			if (responseCard.genericAttachments && responseCard.genericAttachments.length > 0) {
+
+				// we will render at most 1 card
+				var card = responseCard.genericAttachments[0];
+
+				// title
+				var elem = document.createElement('span');
+				elem.className = 'cardTitle';
+				elem.appendChild(document.createTextNode(card.title));
+				responsePara.appendChild(elem);
+
+				// subtitle
+				elem = document.createElement('span');
+				elem.className = 'cardSubtitle';
+				// should we treat the subtitle as text or as HTML?
+				// elem.appendChild(document.createTextNode(card.subTitle));
+				elem.innerHTML = card.subTitle;
+				responsePara.appendChild(elem);
+
+				// options
+				if (card.buttons && (card.buttons.length > 0)) {
+
+					var optionsSpan = document.createElement('span');
+					optionsSpan.className = 'cardOptions';
+					responsePara.appendChild(optionsSpan);
+
+					// remember the responseCardOptions so we know if the user types one in
+					responseCardOptions = card.buttons;
+
+					for (var i=0; (i < card.buttons.length); i++) {
+
+						var item = card.buttons[i];
+
+						elem = document.createElement('a');
+						elem.className = 'cardOption';
+						elem.href = '#';
+						elem.setAttribute('onclick', `postCardOption("${item.text}", "${item.value}", this.parentNode); return false;`);
+						elem.title = item.text;
+						elem.appendChild(document.createTextNode(item.text));
+
+						optionsSpan.appendChild(elem);
+					}
+				}
+			} else
+				throw new Error('I have no response card content to work with!');
+		}
+
+		function showResponse(lexResponse) {
+
+			var conversationDiv = document.getElementById('conversation');
+			var responsePara = document.createElement("P");
+			responsePara.className = 'lexResponse';
+
+			// look for a response card first
+			if (lexResponse.responseCard) {
+
+				// if a larger title is available, use it
+				if (lexResponse.sessionAttributes && lexResponse.sessionAttributes.fullTitle &&
+					(lexResponse.sessionAttributes.fullTitle != lexResponse.responseCard.genericAttachments[0].title)) {
+
+					lexResponse.responseCard.genericAttachments[0].title = lexResponse.sessionAttributes.fullTitle;
+				}
+
+				// if a larger subtitle is available, use it
+				if (lexResponse.sessionAttributes && lexResponse.sessionAttributes.fullSubtitle &&
+					(lexResponse.sessionAttributes.fullSubtitle != lexResponse.responseCard.genericAttachments[0].subTitle)) {
+
+					lexResponse.responseCard.genericAttachments[0].subTitle = lexResponse.sessionAttributes.fullSubtitle;
+				}
+				renderResponseCard(lexResponse.responseCard, responsePara);
+
+			} else if (lexResponse.message) {
+				responsePara.appendChild(document.createTextNode(lexResponse.message));
+				responsePara.appendChild(document.createElement('br'));
+			}
+			/* don't show dialog state for now
+			if (lexResponse.dialogState === 'ReadyForFulfillment') {
+				responsePara.appendChild(document.createTextNode('Ready for fulfillment'));
+				// TODO:  show slot values
+			} else {
+
+				missedUtterances = lexResponse.sessionAttributes.missedUtterances;
+				responsePara.appendChild(document.createTextNode(
+					'(' + lexResponse.dialogState +
+						((missedUtterances !== '0') ? '; ' + missedUtterances + ' missed' : '') + ')'));
+			}
+			*/
+			conversationDiv.appendChild(responsePara);
+			conversationDiv.scrollTop = conversationDiv.scrollHeight;
+		}
+
+		function showKBResponse(queryPhrase) {
+
+			if (document.getElementById('showSearchResults').checked) {
+
+				// add to the other div
+				var kbDiv = document.getElementById('searchResults');
+				if (kbDiv.style.display !== 'block') {
+					kbDiv.style.display = 'block';
+				}
+				var responsePara = document.createElement("P");
+				responsePara.className = 'lexResponse';
+
+				// run the query and get the response (asynchronously)
+				loadResults(queryPhrase, responsePara);
+
+				kbDiv.appendChild(responsePara);
+				kbDiv.scrollTop = kbDiv.scrollHeight;
+			}
+		}
+
+		function loadResults(queryPhrase, responsePara) {
+
+			var xhttp = new XMLHttpRequest();
+			xhttp.onreadystatechange = function() {
+
+				if (this.readyState == 4 && this.status == 200) {
+
+					var searchResponse = JSON.parse(this.responseText);
+					if (searchResponse.hits.total && (searchResponse.hits.total > 0)) {
+
+						// create an element so we can use HTML here...
+						// title
+						var elem = document.createElement('span');
+						elem.className = 'cardTitle';
+						elem.innerHTML = searchResponse.hits.hits[0]._source.question;
+						responsePara.appendChild(elem);
+						responsePara.appendChild(document.createElement('br'));
+
+						// subtitle
+						elem = document.createElement('span');
+						elem.className = 'cardSubtitle';
+						elem.innerHTML = searchResponse.hits.hits[0]._source.answer;
+						responsePara.appendChild(elem);
+						responsePara.appendChild(document.createElement('br'));
+					}
+					responsePara.appendChild(document.createTextNode(`${searchResponse.hits.total} hit(s)`));
+
+					// scroll to the bottom
+					var kbDiv = document.getElementById('searchResults');
+					kbDiv.scrollTop = kbDiv.scrollHeight;
+				}
+			};
+
+			xhttp.open('GET',
+				'https://t7gryarl05.execute-api.us-east-2.amazonaws.com/QA/?queryPhrase=' +
+					encodeURIComponent(queryPhrase),
+				true);
+			xhttp.send();
+		}
+
+		showResponse({
+			message:  'Hi there!  What do you want to do?'
+		});
+		
+
+	</script>
+</body>
+
+</html>
