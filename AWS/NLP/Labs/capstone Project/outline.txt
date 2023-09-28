@@ -1,0 +1,20 @@
+Lab 8
+
+Datasource: MLF Videos
+
+~20 videos
+
+Plot:
+
+1. Transcribe videos
+2. Preprocess text
+3. Extract:
+3a. Topics
+3b. Key Phrases
+4. Build UI that lets them filter/search
+5. Can textract extract text from the png of the slides?
+6. Dashboard in Kibana?
+
+Questions?
+Does the transcript have timestamps? For example, can we find all the places in the video for key phrases etc.
+Can we get all the way there in elastic search/kibana
